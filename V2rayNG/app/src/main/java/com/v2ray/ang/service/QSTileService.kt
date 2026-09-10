@@ -7,16 +7,22 @@ import android.content.IntentFilter
 import android.graphics.drawable.Icon
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
-import android.util.Log
 import androidx.core.content.ContextCompat
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
-import com.v2ray.ang.handler.V2RayServiceManager
-import com.v2ray.ang.util.MessageUtil
+import com.v2ray.ang.core.CoreServiceManager
+import com.v2ray.ang.core.LauncherManager
+import com.v2ray.ang.handler.AppLocaleManager
+import com.v2ray.ang.helper.MessageHelper
+import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.Utils
 import java.lang.ref.SoftReference
 
 class QSTileService : TileService() {
+
+    override fun attachBaseContext(newBase: Context?) {
+        super.attachBaseContext(newBase?.let(AppLocaleManager::localizedContext))
+    }
 
     /**
      * Sets the state of the tile.
@@ -29,7 +35,7 @@ class QSTileService : TileService() {
             qsTile?.label = getString(R.string.app_name)
         } else if (state == Tile.STATE_ACTIVE) {
             qsTile?.state = Tile.STATE_ACTIVE
-            qsTile?.label = V2RayServiceManager.getRunningServerName()
+            qsTile?.label = CoreServiceManager.getRunningServerName()
         }
 
         qsTile?.updateTile()
@@ -42,7 +48,7 @@ class QSTileService : TileService() {
     override fun onStartListening() {
         super.onStartListening()
 
-        if (V2RayServiceManager.isRunning()) {
+        if (CoreServiceManager.isRunning()) {
             setState(Tile.STATE_ACTIVE)
         } else {
             setState(Tile.STATE_INACTIVE)
@@ -50,7 +56,7 @@ class QSTileService : TileService() {
         mMsgReceive = ReceiveMessageHandler(this)
         val mFilter = IntentFilter(AppConfig.BROADCAST_ACTION_ACTIVITY)
         ContextCompat.registerReceiver(applicationContext, mMsgReceive, mFilter, Utils.receiverFlags())
-        MessageUtil.sendMsg2Service(this, AppConfig.MSG_REGISTER_CLIENT, "")
+        MessageHelper.sendMsg2Service(this, AppConfig.MSG_REGISTER_CLIENT, "")
     }
 
     /**
@@ -63,7 +69,7 @@ class QSTileService : TileService() {
             applicationContext.unregisterReceiver(mMsgReceive)
             mMsgReceive = null
         } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to unregister receiver", e)
+            LogUtil.e(AppConfig.TAG, "Failed to unregister receiver", e)
         }
 
     }
@@ -75,11 +81,11 @@ class QSTileService : TileService() {
         super.onClick()
         when (qsTile.state) {
             Tile.STATE_INACTIVE -> {
-                V2RayServiceManager.startVServiceFromToggle(this)
+                LauncherManager.startServiceFromToggle(this)
             }
 
             Tile.STATE_ACTIVE -> {
-                V2RayServiceManager.stopVService(this)
+                LauncherManager.stopService(this)
             }
         }
     }

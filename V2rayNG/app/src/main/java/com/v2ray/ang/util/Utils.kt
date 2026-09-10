@@ -4,14 +4,10 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.content.res.Configuration.UI_MODE_NIGHT_MASK
-import android.content.res.Configuration.UI_MODE_NIGHT_NO
 import android.os.Build
 import android.os.LocaleList
 import android.provider.Settings
-import android.text.Editable
 import android.util.Base64
-import android.util.Log
 import android.util.Patterns
 import android.webkit.URLUtil
 import androidx.core.content.ContextCompat
@@ -20,7 +16,6 @@ import com.v2ray.ang.AppConfig
 import com.v2ray.ang.AppConfig.LOOPBACK
 import com.v2ray.ang.BuildConfig
 import java.io.IOException
-import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.URI
 import java.net.URLDecoder
@@ -35,27 +30,6 @@ object Utils {
     private val IPV4_REGEX =
         Regex("^([01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5])\\.([01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5])\\.([01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5])\\.([01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5])$")
     private val IPV6_REGEX = Regex("^((?:[0-9A-Fa-f]{1,4}))?((?::[0-9A-Fa-f]{1,4}))*::((?:[0-9A-Fa-f]{1,4}))?((?::[0-9A-Fa-f]{1,4}))*|((?:[0-9A-Fa-f]{1,4}))((?::[0-9A-Fa-f]{1,4})){7}$")
-
-    /**
-     * Convert string to editable for Kotlin.
-     *
-     * @param text The string to convert.
-     * @return An Editable instance containing the text.
-     */
-    fun getEditable(text: String?): Editable {
-        return Editable.Factory.getInstance().newEditable(text.orEmpty())
-    }
-
-    /**
-     * Find the position of a value in an array.
-     *
-     * @param array The array to search.
-     * @param value The value to find.
-     * @return The index of the value in the array, or -1 if not found.
-     */
-    fun arrayFind(array: Array<out String>, value: String): Int {
-        return array.indexOf(value)
-    }
 
     /**
      * Parse a string to an integer with a default value.
@@ -79,7 +53,7 @@ object Utils {
             val cmb = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             cmb.primaryClip?.getItemAt(0)?.text.toString()
         } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to get clipboard content", e)
+            LogUtil.e(AppConfig.TAG, "Failed to get clipboard content", e)
             ""
         }
     }
@@ -96,7 +70,7 @@ object Utils {
             val clipData = ClipData.newPlainText(null, content)
             cmb.setPrimaryClip(clipData)
         } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to set clipboard content", e)
+            LogUtil.e(AppConfig.TAG, "Failed to set clipboard content", e)
         }
     }
 
@@ -116,18 +90,18 @@ object Utils {
      * @param text The base64 encoded string.
      * @return The decoded string, or null if decoding fails.
      */
-    fun tryDecodeBase64(text: String?): String? {
+    private fun tryDecodeBase64(text: String?): String? {
         if (text.isNullOrEmpty()) return null
 
         try {
             return Base64.decode(text, Base64.NO_WRAP).toString(Charsets.UTF_8)
         } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to decode standard base64", e)
+            LogUtil.e(AppConfig.TAG, "Failed to decode standard base64", e)
         }
         try {
             return Base64.decode(text, Base64.NO_WRAP.or(Base64.URL_SAFE)).toString(Charsets.UTF_8)
         } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to decode URL-safe base64", e)
+            LogUtil.e(AppConfig.TAG, "Failed to decode URL-safe base64", e)
         }
         return null
     }
@@ -139,7 +113,7 @@ object Utils {
      * @param removePadding
      * @return The base64 encoded string, or an empty string if encoding fails.
      */
-    fun encode(text: String, removePadding : Boolean = false): String {
+    fun encode(text: String, removePadding: Boolean = false): String {
         return try {
             var encoded = Base64.encodeToString(text.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
             if (removePadding) {
@@ -147,7 +121,7 @@ object Utils {
             }
             encoded
         } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to encode text to base64", e)
+            LogUtil.e(AppConfig.TAG, "Failed to encode text to base64", e)
             ""
         }
     }
@@ -190,7 +164,7 @@ object Utils {
 
             return isIpv6Address(addr)
         } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to validate IP address", e)
+            LogUtil.e(AppConfig.TAG, "Failed to validate IP address", e)
             return false
         }
     }
@@ -238,8 +212,10 @@ object Utils {
      */
     private fun isIpv6Address(value: String): Boolean {
         var addr = value
-        if (addr.startsWith("[") && addr.endsWith("]")) {
-            addr = addr.drop(1).dropLast(1)
+        if (addr.startsWith("[")) {
+            val closingBracket = addr.lastIndexOf(']')
+            if (closingBracket <= 1) return false
+            addr = addr.substring(1, closingBracket)
         }
         return IPV6_REGEX.matches(addr)
     }
@@ -271,7 +247,7 @@ object Utils {
                     Patterns.DOMAIN_NAME.matcher(value).matches() ||
                     URLUtil.isValidUrl(value)
         } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to validate URL", e)
+            LogUtil.e(AppConfig.TAG, "Failed to validate URL", e)
             false
         }
     }
@@ -287,7 +263,7 @@ object Utils {
             val uri = uriString.toUri()
             context.startActivity(Intent(Intent.ACTION_VIEW, uri))
         } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to open URI", e)
+            LogUtil.e(AppConfig.TAG, "Failed to open URI", e)
         }
     }
 
@@ -300,38 +276,8 @@ object Utils {
         return try {
             UUID.randomUUID().toString().replace("-", "")
         } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to generate UUID", e)
+            LogUtil.e(AppConfig.TAG, "Failed to generate UUID", e)
             ""
-        }
-    }
-
-    /**
-     * Decode a URL-encoded string.
-     *
-     * @param url The URL-encoded string.
-     * @return The decoded string, or the original string if decoding fails.
-     */
-    fun urlDecode(url: String): String {
-        return try {
-            URLDecoder.decode(url, Charsets.UTF_8.toString())
-        } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to decode URL", e)
-            url
-        }
-    }
-
-    /**
-     * Encode a string to URL-encoded format.
-     *
-     * @param url The string to encode.
-     * @return The URL-encoded string, or the original string if encoding fails.
-     */
-    fun urlEncode(url: String): String {
-        return try {
-            URLEncoder.encode(url, Charsets.UTF_8.toString())
-        } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to encode URL", e)
-            url
         }
     }
 
@@ -349,7 +295,7 @@ object Utils {
             // to avoid cross-language interoperability issues.
             URLDecoder.decode(url.replace("+", "%2B"), Charsets.UTF_8.toString())
         } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to decode encodeURIComponent", e)
+            LogUtil.e(AppConfig.TAG, "Failed to decode encodeURIComponent", e)
             url
         }
     }
@@ -365,7 +311,7 @@ object Utils {
             // Replace '+' with '%20' to conform to encodeURIComponent semantics.
             URLEncoder.encode(url, Charsets.UTF_8.toString()).replace("+", "%20")
         } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to encode encodeURIComponent", e)
+            LogUtil.e(AppConfig.TAG, "Failed to encode encodeURIComponent", e)
             url
         }
     }
@@ -387,7 +333,7 @@ object Utils {
                 }
             }
         } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to read asset file: $fileName", e)
+            LogUtil.e(AppConfig.TAG, "Failed to read asset file: $fileName", e)
             ""
         }
     }
@@ -402,10 +348,9 @@ object Utils {
         if (context == null) return ""
 
         return try {
-            context.getExternalFilesDir(AppConfig.DIR_ASSETS)?.absolutePath
-                ?: context.getDir(AppConfig.DIR_ASSETS, 0).absolutePath
+            context.getDir(AppConfig.DIR_ASSETS, Context.MODE_PRIVATE).absolutePath
         } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to get user asset path", e)
+            LogUtil.e(AppConfig.TAG, "Failed to get user asset path", e)
             ""
         }
     }
@@ -420,19 +365,9 @@ object Utils {
             val androidId = Settings.Secure.ANDROID_ID.toByteArray(Charsets.UTF_8)
             Base64.encodeToString(androidId.copyOf(32), Base64.NO_PADDING.or(Base64.URL_SAFE))
         } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to generate device ID", e)
+            LogUtil.e(AppConfig.TAG, "Failed to generate device ID", e)
             ""
         }
-    }
-
-    /**
-     * Get the dark mode status.
-     *
-     * @param context The context to use.
-     * @return True if dark mode is enabled, false otherwise.
-     */
-    fun getDarkModeStatus(context: Context): Boolean {
-        return context.resources.configuration.uiMode and UI_MODE_NIGHT_MASK != UI_MODE_NIGHT_NO
     }
 
     /**
@@ -470,23 +405,13 @@ object Utils {
     }
 
     /**
-     * Find a free port from a list of ports.
+     * Find a random free port.
      *
-     * @param ports The list of ports to check.
-     * @return The first free port found.
+     * @return A random free port.
      * @throws IOException If no free port is found.
      */
-    fun findFreePort(ports: List<Int>): Int {
-        for (port in ports) {
-            try {
-                return ServerSocket(port).use { it.localPort }
-            } catch (ex: IOException) {
-                continue  // try next port
-            }
-        }
-
-        // if the program gets here, no port in the range was found
-        throw IOException("no free port found")
+    fun findRandomFreePort(): Int {
+        return ServerSocket(0).use { it.localPort }
     }
 
     /**
@@ -512,7 +437,7 @@ object Utils {
                 }
             }
         } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to validate subscription URL", e)
+            LogUtil.e(AppConfig.TAG, "Failed to validate subscription URL", e)
         }
         return false
     }
@@ -536,55 +461,23 @@ object Utils {
     fun isXray(): Boolean = BuildConfig.APPLICATION_ID.startsWith("com.v2ray.ang")
 
     /**
-     * Check if it is the Google Play version.
+     * Check if an IPv4 address is within an IPv4 CIDR range
      *
-     * @return True if the package is Google Play, false otherwise.
-     */
-    fun isGoogleFlavor(): Boolean = BuildConfig.FLAVOR == "playstore"
-
-    /**
-     * Converts an InetAddress to its long representation
-     *
-     * @param ip The InetAddress to convert
-     * @return The long representation of the IP address
-     */
-    private fun inetAddressToLong(ip: InetAddress): Long {
-        val bytes = ip.address
-        var result: Long = 0
-        for (i in bytes.indices) {
-            result = result shl 8 or (bytes[i].toInt() and 0xff).toLong()
-        }
-        return result
-    }
-
-    /**
-     * Check if an IP address is within a CIDR range
-     *
-     * @param ip The IP address to check
-     * @param cidr The CIDR notation range (e.g., "192.168.1.0/24")
+     * @param ip The IPv4 address to check
+     * @param cidr The IPv4 CIDR range (e.g., "192.168.1.0/24")
      * @return True if the IP is within the CIDR range, false otherwise
      */
     fun isIpInCidr(ip: String, cidr: String): Boolean {
-        try {
-            if (!isIpAddress(ip)) return false
+        val parts = cidr.split('/')
+        if (parts.size != 2 || !isIpv4Address(ip) || !isIpv4Address(parts[0])) return false
 
-            // Parse CIDR (e.g., "192.168.1.0/24")
-            val (cidrIp, prefixLen) = cidr.split("/")
-            val prefixLength = prefixLen.toInt()
+        val prefixLength = parts[1].toIntOrNull()?.takeIf { it in 0..32 } ?: return false
+        val mask = if (prefixLength == 0) 0L else (-1L shl (32 - prefixLength))
+        return (ipv4ToLong(ip) and mask) == (ipv4ToLong(parts[0]) and mask)
+    }
 
-            // Convert IP and CIDR's IP portion to Long
-            val ipLong = inetAddressToLong(InetAddress.getByName(ip))
-            val cidrIpLong = inetAddressToLong(InetAddress.getByName(cidrIp))
-
-            // Calculate subnet mask (e.g., /24 → 0xFFFFFF00)
-            val mask = if (prefixLength == 0) 0L else (-1L shl (32 - prefixLength))
-
-            // Check if they're in the same subnet
-            return (ipLong and mask) == (cidrIpLong and mask)
-        } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to check if IP is in CIDR", e)
-            return false
-        }
+    private fun ipv4ToLong(ip: String): Long {
+        return ip.split('.').fold(0L) { result, octet -> (result shl 8) or octet.toLong() }
     }
 
     /**
@@ -599,7 +492,7 @@ object Utils {
             val sdf = SimpleDateFormat(pattern, locale)
             sdf.format(Date(ts))
         } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to format timestamp", e)
+            LogUtil.e(AppConfig.TAG, "Failed to format timestamp", e)
             ""
         }
     }

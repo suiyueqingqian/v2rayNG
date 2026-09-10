@@ -1,10 +1,9 @@
 package com.v2ray.ang.fmt
 
 import com.v2ray.ang.AppConfig
-import com.v2ray.ang.dto.ProfileItem
+import com.v2ray.ang.dto.entities.ProfileItem
 import com.v2ray.ang.enums.NetworkType
 import com.v2ray.ang.extension.nullIfBlank
-import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.util.HttpUtil
 import com.v2ray.ang.util.Utils
 import java.net.URI
@@ -51,15 +50,16 @@ open class FmtBase {
      *
      * @param config the ProfileItem object to populate
      * @param queryParam the query parameters to use for populating the ProfileItem
-     * @param allowInsecure whether to allow insecure connections
      */
-    fun getItemFormQuery(config: ProfileItem, queryParam: Map<String, String>, allowInsecure: Boolean) {
+    fun getItemFormQuery(config: ProfileItem, queryParam: Map<String, String>) {
         config.network = queryParam["type"] ?: NetworkType.TCP.type
         config.headerType = queryParam["headerType"]
         config.host = queryParam["host"]
         config.path = queryParam["path"]
 
         config.seed = queryParam["seed"]
+        config.kcpMtu = queryParam["mtu"]?.toIntOrNull()
+        config.kcpTti = queryParam["tti"]?.toIntOrNull()
         config.quicSecurity = queryParam["quicSecurity"]
         config.quicKey = queryParam["key"]
         config.mode = queryParam["mode"]
@@ -67,6 +67,7 @@ open class FmtBase {
         config.authority = queryParam["authority"]
         config.xhttpMode = queryParam["mode"]
         config.xhttpExtra = queryParam["extra"]
+        config.finalMask = queryParam["fm"]
 
         config.security = queryParam["security"]
         if (config.security != AppConfig.TLS && config.security != AppConfig.REALITY) {
@@ -77,12 +78,13 @@ open class FmtBase {
         config.insecure = when {
             allowInsecureKeys.any { queryParam[it] == "1" } -> true
             allowInsecureKeys.any { queryParam[it] == "0" } -> false
-            else -> allowInsecure
+            else -> false
         }
         config.sni = queryParam["sni"]
         config.fingerPrint = queryParam["fp"]
         config.alpn = queryParam["alpn"]
         config.echConfigList = queryParam["ech"]
+        config.verifyPeerCertByName = queryParam["vcn"]
         config.pinnedCA256 = queryParam["pcs"]
         config.publicKey = queryParam["pbk"]
         config.shortId = queryParam["sid"]
@@ -103,6 +105,7 @@ open class FmtBase {
         config.sni?.nullIfBlank()?.let { dicQuery["sni"] = it }
         config.alpn?.nullIfBlank()?.let { dicQuery["alpn"] = it }
         config.echConfigList?.nullIfBlank()?.let { dicQuery["ech"] = it }
+        config.verifyPeerCertByName?.nullIfBlank()?.let { dicQuery["vcn"] = it }
         config.pinnedCA256?.nullIfBlank()?.let { dicQuery["pcs"] = it }
         config.fingerPrint?.nullIfBlank()?.let { dicQuery["fp"] = it }
         config.publicKey?.nullIfBlank()?.let { dicQuery["pbk"] = it }
@@ -110,6 +113,9 @@ open class FmtBase {
         config.spiderX?.nullIfBlank()?.let { dicQuery["spx"] = it }
         config.mldsa65Verify?.nullIfBlank()?.let { dicQuery["pqv"] = it }
         config.flow?.nullIfBlank()?.let { dicQuery["flow"] = it }
+        config.finalMask?.nullIfBlank()?.let { dicQuery["fm"] = it }
+        config.kcpMtu?.let { dicQuery["mtu"] = it.toString() }
+        config.kcpTti?.let { dicQuery["tti"] = it.toString() }
         // Add two keys for compatibility: "insecure" and "allowInsecure"
         if (config.security == AppConfig.TLS) {
             val insecureFlag = if (config.insecure == true) "1" else "0"
@@ -165,22 +171,5 @@ open class FmtBase {
         }
 
         return dicQuery
-    }
-
-    fun getServerAddress(profileItem: ProfileItem): String {
-        if (Utils.isPureIpAddress(profileItem.server.orEmpty())) {
-            return profileItem.server.orEmpty()
-        }
-
-        val domain = HttpUtil.toIdnDomain(profileItem.server.orEmpty())
-        if (MmkvManager.decodeSettingsString(AppConfig.PREF_OUTBOUND_DOMAIN_RESOLVE_METHOD, "1") != "2") {
-            return domain
-        }
-        //Resolve and replace domain
-        val resolvedIps = HttpUtil.resolveHostToIP(domain, MmkvManager.decodeSettingsBool(AppConfig.PREF_PREFER_IPV6))
-        if (resolvedIps.isNullOrEmpty()) {
-            return domain
-        }
-        return resolvedIps.first()
     }
 }
